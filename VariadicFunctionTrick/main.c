@@ -139,6 +139,6 @@ void ExamplePrint(char* formatString, ...) {
 
 
 int main(void) {
-    print("Name: %, Surname: %, Age: %.\n", "Ali", "Awan", 19.54);
+    print("% % %\n", "Ali", "Awan", 19.54);
     return 0;
 }
