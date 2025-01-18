@@ -5,23 +5,24 @@
 #include <stdbool.h>
 
 typedef struct {
+    void* (*alloc)(size_t size);
+    void  (*dealloc)(void* pointer);
+} DictAllocHooks;
+
+typedef struct {
     char** keys;
     char** values;
     int size;
     int occupied;
+    DictAllocHooks hooks;
 } Dict;
 
-void DictIntialize(Dict* dict, int size, int maxStringSize) {
-    *dict = (Dict) {
-        .keys = malloc(sizeof(char*)*size),
-        .values = malloc(sizeof(char*)*size),
-        .size = size
-    };
-
-    for (int i = 0; i < size; i++) {
-        dict->keys[i] = malloc(maxStringSize);
-        dict->values[i] = malloc(maxStringSize);
-    }
+void DictIntialize(Dict* dict, int size, int maxStringSize, DictAllocHooks hooks) {
+    dict->hooks  = hooks;
+    dict->keys   = hooks.alloc(sizeof(char*)*size);
+    dict->values = hooks.alloc(sizeof(char*)*size);
+    dict->size   = size;
+    dict->hooks  = hooks;
 }
 
 bool DictAdd(Dict* dict, char* key, char* value) {
@@ -32,8 +33,15 @@ bool DictAdd(Dict* dict, char* key, char* value) {
     }
 
     if (dict->occupied < dict->size) {
+        dict->keys[dict->occupied] = dict->hooks.alloc(strlen(key)+1);
+        dict->values[dict->occupied] = dict->hooks.alloc(strlen(value)+1);
+
+        memset(dict->keys[dict->occupied], 0, strlen(key)+1);
+        memset(dict->values[dict->occupied], 0, strlen(key)+1);
+
         strcpy(dict->keys[dict->occupied], key);
         strcpy(dict->values[dict->occupied], value);
+
         dict->occupied++;
         return true;
     }
@@ -54,6 +62,9 @@ char* DictGetValueAtKey(Dict* dict, char* key) {
 bool DictRemoveKeyValuePair(Dict* dict, char* key) {
     for (int i = 0; i < dict->occupied; i++) {
         if (!strcmp(dict->keys[i], key)) {
+            dict->hooks.dealloc(dict->keys[i]);
+            dict->hooks.dealloc(dict->values[i]);
+
             memmove(dict->keys+i, dict->keys+i+1, dict->occupied-i);
             memmove(dict->values+i, dict->values+i+1, dict->occupied-i);
             return true;
@@ -65,7 +76,8 @@ bool DictRemoveKeyValuePair(Dict* dict, char* key) {
 
 int main(void) {
     Dict dict = {};
-    DictIntialize(&dict, 5, 50);
+    DictAllocHooks hooks = { malloc, free };
+    DictIntialize(&dict, 5, 50, hooks);
 
     printf("got here.\n");
     printf("Success: `%d`\n", DictAdd(&dict, "1", "world!"));
