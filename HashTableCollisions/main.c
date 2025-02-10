@@ -15,25 +15,24 @@ typedef struct HashNode {
 typedef struct {
     HashNode* data;
     int count;
-    int occupied;
 } HashTable;
 
-void HashTableInit(HashTable* hashTable, int count) {
+void HashTableInitialize(HashTable* hashTable, int count) {
     *hashTable = (HashTable) {
         .data = malloc(sizeof(HashNode)*count),
-        .count = count,
-        .occupied = 0
+        .count = count
     };
 
     memset(hashTable->data, 0, sizeof(HashNode)*count);
 }
 
-unsigned long GenHash(char* string) {
+
+unsigned long GenHash(char *str) {
     unsigned long hash = 5381;
     int c;
 
-    while ((c = *string++))
-        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+    while ((c = *str++))
+        hash = ((hash << 5) + hash) + c;
 
     return hash;
 }
@@ -41,31 +40,32 @@ unsigned long GenHash(char* string) {
 bool HashTableAdd(HashTable* hashTable, char* key, char* value) {
     int index = GenHash(key) % hashTable->count;
 
-    HashNode* node = &hashTable->data[index];
-    if (node->key == NULL) {
-        *node = (HashNode) {
+    if (hashTable->data[index].key == NULL) {
+        hashTable->data[index] = (HashNode) {
             .key = strdup(key),
             .value = strdup(value),
-            .child = NULL,
-            .parent = NULL
+            .parent = NULL,
+            .child = NULL
         };
 
         return true;
     }
     else {
+        HashNode* node = &hashTable->data[index];
         for (; node->child != NULL; node = node->child);
         node->child = malloc(sizeof(HashNode));
         *node->child = (HashNode) {
             .key = strdup(key),
             .value = strdup(value),
-            .child = NULL,
-            .parent = node 
+            .parent = node,
+            .child = NULL
         };
 
         return true;
     }
 
-    return true;
+
+    return false;
 }
 
 char* HashTableGetValueAtKey(HashTable* hashTable, char* key) {
@@ -74,7 +74,7 @@ char* HashTableGetValueAtKey(HashTable* hashTable, char* key) {
     if (hashTable->data[index].key != NULL) {
         for (HashNode* node = &hashTable->data[index]; node != NULL; node = node->child) {
             if (!strcmp(node->key, key)) {
-                return hashTable->data[index].value;
+                return node->value;
             }
         }
     }
@@ -90,58 +90,57 @@ bool HashTableRemove(HashTable* hashTable, char* key) {
     }
 
     for (HashNode* node = &hashTable->data[index]; node != NULL; node = node->child) {
-        if (node->parent == NULL) {
-            if (!strcmp(node->key, key)) {
+        if (!strcmp(node->key, key)) {
+            if (node->parent == NULL) {
                 free(node->key);
                 free(node->value);
-                node->key = NULL;
-                node->value = NULL;
+
+                if (node->child != NULL) {
+                    hashTable->data[index] = *node->child;
+                    node->child->parent = NULL;
+                }
+
+                return true;
             }
-        }
-        else if (node->child != NULL) {
-            if (!strcmp(node->key, key)) {
+            else if (node->parent != NULL && node->child != NULL) {
                 free(node->key);
                 free(node->value);
-                node->child->parent = node->parent;
+                node->parent->child = node->child;
                 free(node);
+                return true;
             }
-        }
-        else if (node->child == NULL) {
-            if (!strcmp(node->key, key)) {
-                node = node->parent;
-                free(node->child->key);
-                free(node->child->value);
-                free(node->child);
-                node->child = NULL;
+            else {
+                node->parent = NULL;
+                free(node->key);
+                free(node->value);
+                free(node);
+                return true;
             }
         }
     }
 
-    return true;
+    return false;
 }
 
 int main(void) {
     HashTable hashTable = {};
-    HashTableInit(&hashTable, 3);
+    HashTableInitialize(&hashTable, 3);
 
-    int success = HashTableAdd(&hashTable, "good", "morning");
-    printf("Success: %d\n", success);
-    success = HashTableAdd(&hashTable, "some", "else");
-    printf("Success: %d\n", success);
-    success = HashTableAdd(&hashTable, "aoosl", "else");
-    printf("Success: %d\n", success);
-    success = HashTableAdd(&hashTable, "'ffff", "else");
-    printf("Success: %d\n", success);
-    success = HashTableAdd(&hashTable, "fdsaf", "else");
-    printf("Success: %d\n", success);
-    success = HashTableAdd(&hashTable, "dfdas", "else");
-    printf("Success: %d\n", success);
-    success = HashTableAdd(&hashTable, "alsd", "else");
-    printf("Success: %d\n", success);
+    int success = HashTableAdd(&hashTable, "name", "Ali");
+    printf("Success adding key: %d\n", success);
+    success = HashTableAdd(&hashTable, "surname", "Awan");
+    success = HashTableAdd(&hashTable, "ala", "Ali");
+    printf("Success adding key: %d\n", success);
+    success = HashTableAdd(&hashTable, "afa", "Awan");
+    printf("Success adding key: %d\n", success);
+    success = HashTableAdd(&hashTable, "af", "Awan");
+    printf("Success adding key: %d\n", success);
+    success = HashTableAdd(&hashTable, "fa", "Awan");
+    printf("Key: `%s`, Value: `%s`\n", "surname", HashTableGetValueAtKey(&hashTable, "surname"));
+    printf("Key: `%s`, Value: `%s`\n", "asdlkfjsd;l", HashTableGetValueAtKey(&hashTable, "asdlkfjsd;l"));
+    printf("Removed key: %d\n", HashTableRemove(&hashTable, "surname"));
+    printf("Removed key: %d\n", HashTableRemove(&hashTable, "random"));
 
-    printf("key: `dfdas` value: `%s`\n", HashTableGetValueAtKey(&hashTable, "dfdas"));
-    printf("Removed key: `dfdas` successfully `%d`\n", HashTableRemove(&hashTable, "dfdas"));
-    printf("key: `dfdas` value: `%s`\n", HashTableGetValueAtKey(&hashTable, "dfdas"));
 
     return 0;
 }
