@@ -1,0 +1,2 @@
+-Wall
+-ISDL2/include
